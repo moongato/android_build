@@ -22,6 +22,9 @@ else
 ifeq ($(strip $(TARGET_CPU_VARIANT)),cortex-a5)
 	arch_variant_cflags := -mcpu=cortex-a5 -mfpu=neon-vfpv4
 else
+ifeq ($(strip $(TARGET_CPU_VARIANT)),krait)
+	arch_variant_cflags := -mcpu=cortex-a9
+else
 ifeq ($(strip $(TARGET_CPU_VARIANT)),scorpion)
 	arch_variant_cflags := -mcpu=cortex-a8 -mfpu=neon
 else
