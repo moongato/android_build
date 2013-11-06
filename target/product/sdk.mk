@@ -20,21 +20,15 @@ PRODUCT_PROPERTY_OVERRIDES :=
 PRODUCT_PACKAGES := \
 	Calculator \
 	DeskClock \
-	Email \
-	Exchange2 \
 	FusedLocation \
 	Gallery \
 	Keyguard \
 	Music \
 	Mms \
-	OpenWnn \
 	PrintSpooler \
 	libWnnEngDic \
-	libWnnJpnDic \
 	libwnndict \
 	TeleService \
-	PinyinIME \
-	Protips \
 	SoftKeyboard \
 	SystemUI \
 	Launcher2 \

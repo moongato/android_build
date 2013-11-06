@@ -25,15 +25,12 @@ PRODUCT_PACKAGES := \
     Calculator \
     Camera2 \
     CertInstaller \
-    Email \
-    Exchange2 \
     FusedLocation \
     Gallery2 \
     InputDevices \
     Keyguard \
     LatinIME \
     Launcher2 \
-    OneTimeInitializer \
     PrintSpooler \
     Provision \
     Settings \
