@@ -26,7 +26,6 @@ PRODUCT_PACKAGES := \
 	Music \
 	Mms \
 	PrintSpooler \
-	libWnnEngDic \
 	libwnndict \
 	TeleService \
 	SoftKeyboard \
