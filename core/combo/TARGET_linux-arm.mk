@@ -68,16 +68,40 @@ endif
 
 TARGET_NO_UNDEFINED_LDFLAGS := -Wl,--no-undefined
 
-TARGET_arm_CFLAGS :=    -O2 \
+TARGET_arm_CFLAGS :=    -O3 \
                         -fomit-frame-pointer \
                         -fstrict-aliasing    \
-                        -funswitch-loops
+                        -funswitch-loops \
+			-funsafe-loop-optimizations \
+			-ftree-vectorize \
+			-Wstrict-aliasing=2 \
+			-Werror=strict-aliasing \
+			-pipe
 
 # Modules can choose to compile some source as thumb.
-TARGET_thumb_CFLAGS :=  -mthumb \
-                        -Os \
+ifeq ($(TARGET_USE_O3),true)
+    TARGET_thumb_CFLAGS := -mthumb \
+                        -O3 \
                         -fomit-frame-pointer \
-                        -fno-strict-aliasing
+                        -funsafe-math-optimizations \
+                        -fno-strict-aliasing \
+                        -pipe
+else
+    TARGET_thumb_CFLAGS :=  -mthumb \
+                            -Os \
+                            -fomit-frame-pointer \
+                            -funsafe-math-optimizations \
+                            -fno-strict-aliasing \
+                            -pipe
+endif
+
+TARGET_arm_CFLAGS +=    -Wno-unused-parameter \
+                        -Wno-unused-value \
+                        -Wno-unused-function
+
+TARGET_thumb_CFLAGS +=  -Wno-unused-parameter \
+                        -Wno-unused-value \
+                        -Wno-unused-function
 
 # Set FORCE_ARM_DEBUGGING to "true" in your buildspec.mk
 # or in your environment to force a full arm build, even for
@@ -105,6 +129,7 @@ TARGET_GLOBAL_CFLAGS += \
 			-Werror=format-security \
 			-D_FORTIFY_SOURCE=2 \
 			-fno-short-enums \
+			-pipe \
 			$(arch_variant_cflags) \
 			-include $(android_config_h) \
 			-I $(dir $(android_config_h))
@@ -300,3 +325,4 @@ $(hide) $(PRIVATE_CXX) -nostdlib -Bstatic \
 	-Wl,--end-group \
 	$(if $(filter true,$(PRIVATE_NO_CRT)),,$(PRIVATE_TARGET_CRTEND_O))
 endef
+
