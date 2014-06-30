@@ -24,11 +24,7 @@ PRODUCT_PACKAGES := \
     WAPPushManager
 
 PRODUCT_PACKAGES += \
-    Galaxy4 \
-    HoloSpiralWallpaper \
-    LiveWallpapers \
     LiveWallpapersPicker \
-    NoiseField \
     VisualizationWallpapers \
     PhotoTable
 
