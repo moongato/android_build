@@ -21,6 +21,7 @@
 
 PRODUCT_PACKAGES := \
     libfwdlockengine \
+    VideoEditor \
     WAPPushManager
 
 PRODUCT_PACKAGES += \
@@ -28,7 +29,9 @@ PRODUCT_PACKAGES += \
     HoloSpiralWallpaper \
     LiveWallpapers \
     LiveWallpapersPicker \
+    MagicSmokeWallpapers \
     NoiseField \
+    PhaseBeam \
     VisualizationWallpapers \
     PhotoTable
 

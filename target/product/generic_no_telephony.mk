@@ -31,7 +31,10 @@ PRODUCT_PACKAGES := \
     InputDevices \
     Keyguard \
     LatinIME \
+    Launcher2 \
+    Music \
     MusicFX \
+    OneTimeInitializer \
     PrintSpooler \
     Provision \
     Settings \

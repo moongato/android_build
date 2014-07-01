@@ -23,6 +23,7 @@ PRODUCT_PACKAGES += \
     BasicDreams \
     Browser \
     Contacts \
+    DocumentsUI \
     DownloadProviderUi \
     ExternalStorageProvider \
     KeyChain \
