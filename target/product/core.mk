@@ -27,6 +27,7 @@ PRODUCT_PACKAGES += \
     DownloadProviderUi \
     ExternalStorageProvider \
     KeyChain \
+    PicoTts \
     PacProcessor \
     ProxyHandler \
     SharedStorageBackup \
