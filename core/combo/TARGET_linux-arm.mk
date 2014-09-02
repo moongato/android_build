@@ -44,7 +44,9 @@ endif
 # 4.8 is default in my optimizations, as it gives noticable performance boost
 ifeq ($(strip $(TARGET_GCC_VERSION_EXP)),)
 #TARGET_GCC_VERSION := 4.7
-TARGET_GCC_VERSION := 4.8
+#TARGET_GCC_VERSION := 4.8
+# SaberMod Toolchain
+TARGET_GCC_VERSION := 4.8-sm
 else
 TARGET_GCC_VERSION := $(TARGET_GCC_VERSION_EXP)
 endif
