@@ -21,7 +21,6 @@
 
 PRODUCT_PACKAGES += \
     BasicDreams \
-    Browser \
     Calculator \
     Calendar \
     CalendarProvider \
@@ -29,7 +28,6 @@ PRODUCT_PACKAGES += \
     CertInstaller \
     Contacts \
     DeskClock \
-    DocumentsUI \
     DownloadProviderUi \
     ExternalStorageProvider \
     FusedLocation \
@@ -38,7 +36,6 @@ PRODUCT_PACKAGES += \
     Keyguard \
     LatinIME \
     ManagedProvisioning \
-    PicoTts \
     PacProcessor \
     libpac \
     PrintSpooler \
