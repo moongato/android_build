@@ -1,5 +1,17 @@
 # Put some miscellaneous rules here
 
+# Build system colors
+
+ifneq ($(BUILD_WITH_COLORS),0)
+  CL_RED="\033[31m"
+  CL_GRN="\033[32m"
+  CL_YLW="\033[33m"
+  CL_BLU="\033[34m"
+  CL_MAG="\033[35m"
+  CL_CYN="\033[36m"
+  CL_RST="\033[0m"
+endif
+
 # HACK: clear LOCAL_PATH from including last build target before calling
 # intermedites-dir-for
 LOCAL_PATH := $(BUILD_SYSTEM)
@@ -33,7 +45,6 @@ unique_product_copy_files_destinations :=
 $(foreach cf,$(PRODUCT_COPY_FILES), \
     $(eval _src := $(call word-colon,1,$(cf))) \
     $(eval _dest := $(call word-colon,2,$(cf))) \
-    $(call check-product-copy-files,$(cf)) \
     $(if $(filter $(unique_product_copy_files_destinations),$(_dest)), \
         $(info PRODUCT_COPY_FILES $(cf) ignored.), \
         $(eval _fulldest := $(call append-path,$(PRODUCT_OUT),$(_dest))) \
@@ -244,7 +255,7 @@ endif
 		        echo "#" >> $@; )
 	$(hide) $(foreach line,$(ADDITIONAL_BUILD_PROPERTIES), \
 		echo "$(line)" >> $@;)
-	$(hide) build/tools/post_process_props.py $@ $(PRODUCTS.$(INTERNAL_PRODUCT).PRODUCT_SYSTEM_PROPERTY_BLACKLIST)
+	$(hide) build/tools/post_process_props.py $@ "$(PRODUCT_PROPERTY_UBER_OVERRIDES)" $(PRODUCTS.$(INTERNAL_PRODUCT).PRODUCT_SYSTEM_PROPERTY_BLACKLIST)
 ifdef EXTENDED_POST_PROCESS_PROPS
 	$(hide) $(EXTENDED_POST_PROCESS_PROPS) $@
 endif
@@ -505,6 +516,7 @@ INTERNAL_BOOTIMAGE_ARGS += --genext2fs $(MKEXT2IMG)
 $(INSTALLED_BOOTIMAGE_TARGET): $(MKEXT2IMG) $(INTERNAL_BOOTIMAGE_FILES)
 	$(call pretty,"Target boot image: $@")
 	$(hide) $(MKEXT2BOOTIMG) $(INTERNAL_BOOTIMAGE_ARGS) --output $@
+	@echo -e ${CL_CYN}"Made boot image: $@"${CL_RST}
 
 .PHONY: bootimage-nodeps
 bootimage-nodeps: $(MKEXT2IMG)
@@ -534,12 +546,14 @@ $(INSTALLED_BOOTIMAGE_TARGET): $(MKBOOTIMG) $(INTERNAL_BOOTIMAGE_FILES) $(BOOTIM
 	$(call pretty,"Target boot image: $@")
 	$(hide) $(MKBOOTIMG) $(INTERNAL_BOOTIMAGE_ARGS) $(BOARD_MKBOOTIMG_ARGS) --output $@
 	$(hide) $(call assert-max-image-size,$@,$(BOARD_BOOTIMAGE_PARTITION_SIZE))
+	@echo -e ${CL_CYN}"Made boot image: $@"${CL_RST}
 
 .PHONY: bootimage-nodeps
 bootimage-nodeps: $(MKBOOTIMG)
 	@echo "make $@: ignoring dependencies"
 	$(hide) $(MKBOOTIMG) $(INTERNAL_BOOTIMAGE_ARGS) $(BOARD_MKBOOTIMG_ARGS) --output $(INSTALLED_BOOTIMAGE_TARGET)
 	$(hide) $(call assert-max-image-size,$(INSTALLED_BOOTIMAGE_TARGET),$(BOARD_BOOTIMAGE_PARTITION_SIZE))
+	@echo -e ${CL_INS}"Made boot image: $@"${CL_RST}
 
   endif # PRODUCT_SUPPORTS_VERITY
 endif # TARGET_BOOTIMAGE_USE_EXT2 / BOARD_CUSTOM_BOOTIMG_MK
@@ -646,7 +660,7 @@ endif  # TARGET_BUILD_APPS
 $(kernel_notice_file): \
 	    prebuilts/qemu-kernel/arm/LINUX_KERNEL_COPYING \
 	    | $(ACP)
-	@echo Copying: $@
+	@echo -e ${CL_CYN}"Copying:"${CL_RST}" $@"
 	$(hide) mkdir -p $(dir $@)
 	$(hide) $(ACP) $< $@
 
@@ -761,13 +775,14 @@ ifeq (,$(filter true, $(TARGET_NO_KERNEL) $(TARGET_NO_RECOVERY)))
 
 INSTALLED_RECOVERYIMAGE_TARGET := $(PRODUCT_OUT)/recovery.img
 
-recovery_initrc := $(call include-path-for, recovery)/etc/init.rc
+recovery_initrc := $(call project-path-for,recovery)/etc/init.rc
 recovery_sepolicy := $(call intermediates-dir-for,ETC,sepolicy.recovery)/sepolicy.recovery
 recovery_kernel := $(INSTALLED_KERNEL_TARGET) # same as a non-recovery system
 recovery_ramdisk := $(PRODUCT_OUT)/ramdisk-recovery.img
+recovery_uncompressed_ramdisk := $(PRODUCT_OUT)/ramdisk-recovery.cpio
 recovery_build_prop := $(INSTALLED_BUILD_PROP_TARGET)
 recovery_binary := $(call intermediates-dir-for,EXECUTABLES,recovery)/recovery
-recovery_resources_common := $(call include-path-for, recovery)/res
+recovery_resources_common := $(call project-path-for,recovery)/res
 
 # Set recovery_density to the density bucket of the device.
 recovery_density := unknown
@@ -795,9 +810,19 @@ endif
 # its private recovery resources.
 
 ifneq (,$(filter xxxhdpi xxhdpi xhdpi,$(recovery_density)))
-recovery_font := $(call include-path-for, recovery)/fonts/18x32.png
+recovery_font := $(call project-path-for,recovery)/fonts/18x32.png
 else
-recovery_font := $(call include-path-for, recovery)/fonts/12x22.png
+recovery_font := $(call project-path-for,recovery)/fonts/12x22.png
+endif
+
+ifneq ($(TARGET_RECOVERY_DEVICE_DIRS),)
+recovery_root_private := $(strip \
+  $(foreach d,$(TARGET_RECOVERY_DEVICE_DIRS), $(wildcard $(d)/recovery/root)))
+else
+recovery_root_private := $(strip $(wildcard $(TARGET_DEVICE_DIR)/recovery/root))
+endif
+ifneq ($(recovery_root_private),)
+recovery_root_deps := $(shell find $(recovery_root_private) -type f)
 endif
 
 recovery_resources_private := $(strip $(wildcard $(TARGET_DEVICE_DIR)/recovery/res))
@@ -864,16 +889,15 @@ $(recovery_ramdisk): $(MKBOOTFS) $(MINIGZIP) $(RECOVERYIMAGE_EXTRA_DEPS) \
 		$(recovery_binary) \
 		$(recovery_initrc) $(recovery_sepolicy) \
 		$(INSTALLED_2NDBOOTLOADER_TARGET) \
-		$(recovery_build_prop) $(recovery_resource_deps) \
+		$(recovery_build_prop) $(recovery_resource_deps) $(recovery_root_deps) \
 		$(recovery_fstab) \
 		$(RECOVERY_INSTALL_OTA_KEYS)
-	@echo ----- Making recovery image ------
-	$(hide) rm -rf $(TARGET_RECOVERY_OUT)
+	@echo -e ${CL_CYN}"----- Making recovery image ------"${CL_RST}
 	$(hide) mkdir -p $(TARGET_RECOVERY_OUT)
 	$(hide) mkdir -p $(TARGET_RECOVERY_ROOT_OUT)/etc $(TARGET_RECOVERY_ROOT_OUT)/tmp
-	@echo Copying baseline ramdisk...
+	@echo -e ${CL_CYN}"Copying baseline ramdisk..."${CL_RST}
 	$(hide) cp -R $(TARGET_ROOT_OUT) $(TARGET_RECOVERY_OUT)
-	@echo Modifying ramdisk contents...
+	@echo -e ${CL_CYN}"Modifying ramdisk contents..."${CL_RST}
 	$(hide) rm -f $(TARGET_RECOVERY_ROOT_OUT)/init*.rc
 	$(hide) cp -f $(recovery_initrc) $(TARGET_RECOVERY_ROOT_OUT)/
 	$(hide) rm -f $(TARGET_RECOVERY_ROOT_OUT)/sepolicy
@@ -883,6 +907,8 @@ $(recovery_ramdisk): $(MKBOOTFS) $(MINIGZIP) $(RECOVERYIMAGE_EXTRA_DEPS) \
 	$(hide) mkdir -p $(TARGET_RECOVERY_ROOT_OUT)/res
 	$(hide) cp -rf $(recovery_resources_common)/* $(TARGET_RECOVERY_ROOT_OUT)/res
 	$(hide) cp -f $(recovery_font) $(TARGET_RECOVERY_ROOT_OUT)/res/images/font.png
+	$(hide) $(foreach item,$(recovery_root_private), \
+	  cp -rf $(item) $(TARGET_RECOVERY_OUT)/)
 	$(hide) $(foreach item,$(recovery_resources_private), \
 	  cp -rf $(item) $(TARGET_RECOVERY_ROOT_OUT)/)
 	$(hide) $(foreach item,$(recovery_fstab), \
@@ -892,6 +918,10 @@ $(recovery_ramdisk): $(MKBOOTFS) $(MINIGZIP) $(RECOVERYIMAGE_EXTRA_DEPS) \
 	        > $(TARGET_RECOVERY_ROOT_OUT)/default.prop
 	$(hide) $(MKBOOTFS) $(TARGET_RECOVERY_ROOT_OUT) | $(MINIGZIP) > $(recovery_ramdisk)
 
+$(recovery_uncompressed_ramdisk): $(MINIGZIP) $(recovery_ramdisk)
+	@echo -e ${CL_CYN}"----- Making uncompressed recovery ramdisk ------"${CL_RST}
+	$(MKBOOTFS) $(TARGET_RECOVERY_ROOT_OUT) > $@
+
 ifndef BOARD_CUSTOM_BOOTIMG_MK
 $(INSTALLED_RECOVERYIMAGE_TARGET): $(MKBOOTIMG) $(recovery_ramdisk) \
 		$(recovery_kernel)
@@ -900,7 +930,7 @@ ifeq (true,$(PRODUCTS.$(INTERNAL_PRODUCT).PRODUCT_SUPPORTS_VERITY))
 	$(BOOT_SIGNER) /recovery $@ $(PRODUCTS.$(INTERNAL_PRODUCT).PRODUCT_VERITY_SIGNING_KEY) $@
 endif
 	$(hide) $(call assert-max-image-size,$@,$(BOARD_RECOVERYIMAGE_PARTITION_SIZE))
-	@echo ----- Made recovery image: $@ --------
+	@echo -e ${CL_CYN}"Made recovery image: $@"${CL_RST}
 
 endif # BOARD_CUSTOM_BOOTIMG_MK
 
@@ -915,6 +945,14 @@ endif
 
 .PHONY: recoveryimage
 recoveryimage: $(INSTALLED_RECOVERYIMAGE_TARGET) $(RECOVERY_RESOURCE_ZIP)
+
+INSTALLED_RECOVERYZIP_TARGET := $(PRODUCT_OUT)/utilities/update.zip
+$(INSTALLED_RECOVERYZIP_TARGET): $(INSTALLED_RECOVERYIMAGE_TARGET) $(TARGET_OUT)/bin/updater
+	@echo ----- Making recovery zip -----
+	./build/tools/device/mkrecoveryzip.sh $(PRODUCT_OUT) $(HOST_OUT_JAVA_LIBRARIES)/signapk.jar
+
+.PHONY: recoveryzip
+recoveryzip: $(INSTALLED_RECOVERYZIP_TARGET)
 
 ifneq ($(BOARD_NAND_PAGE_SIZE),)
 mkyaffs2_extra_flags := -c $(BOARD_NAND_PAGE_SIZE)
@@ -1023,14 +1061,14 @@ $(RECOVERY_FROM_BOOT_PATCH): $(INSTALLED_RECOVERYIMAGE_TARGET) \
                              $(INSTALLED_BOOTIMAGE_TARGET) \
 			     $(HOST_OUT_EXECUTABLES)/imgdiff \
 	                     $(HOST_OUT_EXECUTABLES)/bsdiff
-	@echo "Construct recovery from boot"
+	@echo -e ${CL_CYN}"Construct recovery from boot"${CL_RST}
 	mkdir -p $(dir $@)
 	PATH=$(HOST_OUT_EXECUTABLES):$$PATH $(HOST_OUT_EXECUTABLES)/imgdiff $(INSTALLED_BOOTIMAGE_TARGET) $(INSTALLED_RECOVERYIMAGE_TARGET) $@
 endif
 
 
 $(INSTALLED_SYSTEMIMAGE): $(BUILT_SYSTEMIMAGE) $(RECOVERY_FROM_BOOT_PATCH) | $(ACP)
-	@echo "Install system fs image: $@"
+	@echo -e ${CL_CYN}"Install system fs image: $@"${CL_RST}
 	$(copy-file-to-target)
 	$(hide) $(call assert-max-image-size,$@ $(RECOVERY_FROM_BOOT_PATCH),$(BOARD_SYSTEMIMAGE_PARTITION_SIZE))
 
@@ -1280,6 +1318,7 @@ endif # BOARD_VENDORIMAGE_FILE_SYSTEM_TYPE
 # host tools needed to build dist and OTA packages
 
 DISTTOOLS :=  $(HOST_OUT_EXECUTABLES)/minigzip \
+	  $(HOST_OUT_EXECUTABLES)/adb \
 	  $(HOST_OUT_EXECUTABLES)/mkbootfs \
 	  $(HOST_OUT_EXECUTABLES)/mkbootimg \
 	  $(HOST_OUT_EXECUTABLES)/fs_config \
@@ -1349,6 +1388,21 @@ else
 $(BUILT_TARGET_FILES_PACKAGE): tool_extensions := $(TARGET_RELEASETOOLS_EXTENSIONS)
 endif
 
+ifeq ($(BOARD_USES_UBOOT_MULTIIMAGE),true)
+
+  ZIP_SAVE_UBOOTIMG_ARGS := -A ARM -O Linux -T multi -C none -n Image
+
+  BOARD_UBOOT_ENTRY := $(strip $(BOARD_UBOOT_ENTRY))
+  ifdef BOARD_UBOOT_ENTRY
+    ZIP_SAVE_UBOOTIMG_ARGS += -e $(BOARD_UBOOT_ENTRY)
+  endif
+  BOARD_UBOOT_LOAD := $(strip $(BOARD_UBOOT_LOAD))
+  ifdef BOARD_UBOOT_LOAD
+    ZIP_SAVE_UBOOTIMG_ARGS += -a $(BOARD_UBOOT_LOAD)
+  endif
+
+endif
+
 # Depending on the various images guarantees that the underlying
 # directories are up-to-date.
 $(BUILT_TARGET_FILES_PACKAGE): \
@@ -1365,7 +1419,7 @@ $(BUILT_TARGET_FILES_PACKAGE): \
 		$(APKCERTS_FILE) \
 		$(HOST_OUT_EXECUTABLES)/fs_config \
 		| $(ACP)
-	@echo "Package target files: $@"
+	@echo -e ${CL_YLW}"Package target files:"${CL_RST}" $@"
 	$(hide) rm -rf $@ $(zip_root)
 	$(hide) mkdir -p $(dir $@) $(zip_root)
 	@# Components of the recovery image
@@ -1434,6 +1488,9 @@ endif
 ifeq ($(strip $(BOARD_KERNEL_SEPARATED_DT)),true)
 	$(hide) echo "$(INSTALLED_DTIMAGE_TARGET)" > $(zip_root)/BOOT/dt_args
 endif
+ifdef ZIP_SAVE_UBOOTIMG_ARGS
+	$(hide) echo "$(ZIP_SAVE_UBOOTIMG_ARGS)" > $(zip_root)/BOOT/ubootargs
+endif
 	$(hide) $(foreach t,$(INSTALLED_RADIOIMAGE_TARGET),\
 	            mkdir -p $(zip_root)/RADIO; \
 	            $(ACP) $(t) $(zip_root)/RADIO/$(notdir $(t));)
@@ -1443,6 +1500,12 @@ endif
 	@# Contents of the data image
 	$(hide) $(call package_files-copy-root, \
 		$(TARGET_OUT_DATA),$(zip_root)/DATA)
+ifdef BOARD_CUSTOM_BOOTIMG
+	@# Prebuilt boot images
+	$(hide) mkdir -p $(zip_root)/BOOTABLE_IMAGES
+	$(hide) $(ACP) $(INSTALLED_BOOTIMAGE_TARGET) $(zip_root)/BOOTABLE_IMAGES/
+	$(hide) $(ACP) $(INSTALLED_RECOVERYIMAGE_TARGET) $(zip_root)/BOOTABLE_IMAGES/
+endif
 ifdef BOARD_VENDORIMAGE_FILE_SYSTEM_TYPE
 	@# Contents of the vendor image
 	$(hide) $(call package_files-copy-root, \
@@ -1490,8 +1553,16 @@ ifneq ($(OEM_THUMBPRINT_PROPERTIES),)
 	# OTA scripts are only interested in fingerprint related properties
 	$(hide) echo "oem_fingerprint_properties=$(OEM_THUMBPRINT_PROPERTIES)" >> $(zip_root)/META/misc_info.txt
 endif
+ifdef BUILD_NO
+	$(hide) echo "build_number=$(BUILD_NO)" >> $(zip_root)/META/misc_info.txt
+endif
 	$(call generate-userimage-prop-dictionary, $(zip_root)/META/misc_info.txt)
 	$(hide) ./build/tools/releasetools/make_recovery_patch $(zip_root) $(zip_root)
+ifdef PRODUCT_DEFAULT_DEV_CERTIFICATE
+	$(hide) build/tools/getb64key.py $(PRODUCT_DEFAULT_DEV_CERTIFICATE).x509.pem > $(zip_root)/META/releasekey.txt
+else
+	$(hide) build/tools/getb64key.py $(DEFAULT_SYSTEM_DEV_CERTIFICATE).x509.pem > $(zip_root)/META/releasekey.txt
+endif
 	@# Zip everything up, preserving symlinks
 	$(hide) (cd $(zip_root) && zip -qry ../$(notdir $@) .)
 	@# Run fs_config on all the system, vendor, boot ramdisk,
@@ -1537,10 +1608,14 @@ endif
 BOOT_ZIP_FROM_IMAGE_SCRIPT := ./build/tools/releasetools/boot_flash_from_image
 KERNEL_PATH := $(TARGET_KERNEL_SOURCE)/arch/arm/configs/$(TARGET_KERNEL_CONFIG)
 
+ifeq ($(WITH_GMS),true)
+    $(INTERNAL_OTA_PACKAGE_TARGET): backuptool := false
+else
 ifneq ($(SLIM_BUILD),)
     $(INTERNAL_OTA_PACKAGE_TARGET): backuptool := false   # disabled for now
 else
     $(INTERNAL_OTA_PACKAGE_TARGET): backuptool := false
+endif
 endif
 
 ifeq ($(TARGET_UNIFIED_DEVICE),)
@@ -1553,8 +1628,16 @@ ifneq ($(SLIM_BUILD),)
 SLIM_TARGET_PACKAGE := $(PRODUCT_OUT)/$(SLIM_MOD_VERSION).zip
 endif
 
+ifeq ($(TARGET_OTA_ASSERT_DEVICE),)
+    $(INTERNAL_OTA_PACKAGE_TARGET): override_device := auto
+else
+    $(INTERNAL_OTA_PACKAGE_TARGET): override_device := $(TARGET_OTA_ASSERT_DEVICE)
+endif
+
 $(INTERNAL_OTA_PACKAGE_TARGET): $(BUILT_TARGET_FILES_PACKAGE) $(DISTTOOLS)
-	@echo "Package OTA: $@"
+	@echo "$(OTA_FROM_TARGET_SCRIPT)" > $(PRODUCT_OUT)/ota_script_path
+	@echo "$(override_device)" > $(PRODUCT_OUT)/ota_override_device
+	@echo -e ${CL_YLW}"Package OTA:"${CL_RST}" $@"
 	$(hide) MKBOOTIMG=$(MKBOOTIMG) \
 	   CUSTOM_BOOTING_MK=$(BOARD_CUSTOM_BOOTIMG_MK) \
 	   $(OTA_FROM_TARGET_SCRIPT) -v \
@@ -1610,7 +1693,7 @@ else
 endif
 
 $(INTERNAL_UPDATE_PACKAGE_TARGET): $(BUILT_TARGET_FILES_PACKAGE) $(DISTTOOLS)
-	@echo "Package: $@"
+	@echo -e ${CL_YLW}"Package:"${CL_RST}" $@"
 	$(hide) MKBOOTIMG=$(MKBOOTIMG) \
 	   CUSTOM_BOOTING_MK=$(BOARD_CUSTOM_BOOTIMG_MK) \
 	   $(IMG_FROM_TARGET_SCRIPT) -v \
@@ -1653,7 +1736,7 @@ name := $(name)-apps-$(FILE_NAME_TAG)
 
 APPS_ZIP := $(PRODUCT_OUT)/$(name).zip
 $(APPS_ZIP): $(INSTALLED_SYSTEMIMAGE)
-	@echo "Package apps: $@"
+	@echo -e ${CL_YLW}"Package apps:"${CL_RST}" $@"
 	$(hide) rm -rf $@
 	$(hide) mkdir -p $(dir $@)
 	$(hide) zip -qj $@ $(TARGET_OUT_APPS)/*/*.apk $(TARGET_OUT_APPS_PRIVILEGED)/*/*.apk
@@ -1715,7 +1798,7 @@ name := $(TARGET_PRODUCT)-emulator-$(FILE_NAME_TAG)
 INTERNAL_EMULATOR_PACKAGE_TARGET := $(PRODUCT_OUT)/$(name).zip
 
 $(INTERNAL_EMULATOR_PACKAGE_TARGET): $(INTERNAL_EMULATOR_PACKAGE_FILES)
-	@echo "Package: $@"
+	@echo -e ${CL_YLW}"Package:"${CL_RST}" $@"
 	$(hide) zip -qj $@ $(INTERNAL_EMULATOR_PACKAGE_FILES)
 
 endif
