@@ -29,11 +29,12 @@ PRODUCT_PACKAGES := \
 PRODUCT_PACKAGES += \
     clatd \
     clatd.conf \
+    javax.btobex \
     pppd \
     screenrecord
 
 PRODUCT_PACKAGES += \
-    librs_jni 
+    librs_jni
 
 PRODUCT_PACKAGES += \
     audio.primary.default \
