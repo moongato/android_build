@@ -20,6 +20,7 @@
 PRODUCT_PACKAGES := \
     Bluetooth \
     Camera2 \
+    DashClock \
     Gallery2 \
     MusicFX \
     OneTimeInitializer \
