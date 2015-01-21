@@ -71,6 +71,7 @@ ifeq ($(TARGET_USE_O3),true)
 $(combo_2nd_arch_prefix)TARGET_arm_CFLAGS :=    -O3 \
                         -fomit-frame-pointer \
                         -fstrict-aliasing    \
+			-Wno-clobbered       \
                         -funswitch-loops
 else
 $(combo_2nd_arch_prefix)TARGET_arm_CFLAGS :=    -Os \
