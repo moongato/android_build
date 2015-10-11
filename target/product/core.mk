@@ -28,7 +28,6 @@ PRODUCT_PACKAGES += \
     Contacts \
     DocumentsUI \
     DownloadProviderUi \
-    Exchange2 \
     ExternalStorageProvider \
     FusedLocation \
     InputDevices \
