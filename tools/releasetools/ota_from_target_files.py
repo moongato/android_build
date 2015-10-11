@@ -549,8 +549,8 @@ def WriteFullOTAPackage(input_zip, output_zip):
   #    complete script normally
   #    (allow recovery to mark itself finished and reboot)
 
-  recovery_img = common.GetBootableImage("recovery.img", "recovery.img",
-                                         OPTIONS.input_tmp, "RECOVERY")
+#  recovery_img = common.GetBootableImage("recovery.img", "recovery.img",
+#                                         OPTIONS.input_tmp, "RECOVERY")
   if OPTIONS.two_step:
     if not OPTIONS.info_dict.get("multistage_support", None):
       assert False, "two-step packages not supported by this build"
@@ -601,8 +601,11 @@ else if get_stage("%(bcb_dev)s") == "3/3" then
     system_diff = common.BlockDifference("system", system_tgt, src=None)
     system_diff.WriteScript(script, output_zip)
   else:
+    script.script.append('unmount("/system");')
+    script.script.append('unmount("/data");')
     script.FormatPartition("/system")
     script.Mount("/system", recovery_mount_options)
+    script.Mount("/data")
     if not has_recovery_patch:
       script.UnpackPackageDir("recovery", "/system")
     script.UnpackPackageDir("system", "/system")
@@ -618,8 +621,8 @@ else if get_stage("%(bcb_dev)s") == "3/3" then
       common.ZipWriteStr(output_zip, "recovery/" + fn, data)
       system_items.Get("system/" + fn)
 
-    common.MakeRecoveryPatch(OPTIONS.input_tmp, output_sink,
-                             recovery_img, boot_img)
+#    common.MakeRecoveryPatch(OPTIONS.input_tmp, output_sink,
+#                             recovery_img, boot_img)
 
     system_items.GetMetadata(input_zip)
     system_items.Get("system").SetPermissions(script)
@@ -647,6 +650,16 @@ else if get_stage("%(bcb_dev)s") == "3/3" then
   common.CheckSize(boot_img.data, "boot.img", OPTIONS.info_dict)
   common.ZipWriteStr(output_zip, "boot.img", boot_img.data)
 
+  if block_based:
+    script.Print("Flashing SuperSU...")
+    common.ZipWriteStr(output_zip, "supersu/supersu.zip",
+                   ""+input_zip.read("SYSTEM/addon.d/UPDATE-SuperSU.zip"))
+    script.Mount("/system")
+    script.FlashSuperSU()
+
+  if block_based:
+    script.Unmount("/system")
+
   script.ShowProgress(0.05, 5)
   script.WriteRawImage("/boot", "boot.img")
 
@@ -655,6 +668,11 @@ else if get_stage("%(bcb_dev)s") == "3/3" then
 
   if OPTIONS.extra_script is not None:
     script.AppendExtra(OPTIONS.extra_script)
+
+  # SuperSU leave /system unmounted while we need it mounted here to avoid
+  # a warning from non-Multirom TWRP
+  if block_based:
+    script.Mount("/system")
 
   script.UnmountAll()
 
@@ -1181,12 +1199,12 @@ def WriteIncrementalOTAPackage(target_zip, source_zip, output_zip):
   updating_boot = (not OPTIONS.two_step and
                    (source_boot.data != target_boot.data))
 
-  source_recovery = common.GetBootableImage(
-      "/tmp/recovery.img", "recovery.img", OPTIONS.source_tmp, "RECOVERY",
-      OPTIONS.source_info_dict)
-  target_recovery = common.GetBootableImage(
-      "/tmp/recovery.img", "recovery.img", OPTIONS.target_tmp, "RECOVERY")
-  updating_recovery = (source_recovery.data != target_recovery.data)
+#  source_recovery = common.GetBootableImage(
+#      "/tmp/recovery.img", "recovery.img", OPTIONS.source_tmp, "RECOVERY",
+#      OPTIONS.source_info_dict)
+#  target_recovery = common.GetBootableImage(
+#      "/tmp/recovery.img", "recovery.img", OPTIONS.target_tmp, "RECOVERY")
+#  updating_recovery = (source_recovery.data != target_recovery.data)
 
   # Here's how we divide up the progress bar:
   #  0.1 for verifying the start state (PatchCheck calls)

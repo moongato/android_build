@@ -332,6 +332,22 @@ endif
 PRODUCT_COPY_FILES := \
     $(strip $(PRODUCTS.$(INTERNAL_PRODUCT).PRODUCT_COPY_FILES))
 
+# We might want to skip items listed in PRODUCT_COPY_FILES for
+# various reasons. This is useful for replacing a binary module with one
+# built from source. This should be a list of destination files under $OUT
+PRODUCT_COPY_FILES_OVERRIDES := \
+	$(addprefix %:, $(strip $(PRODUCTS.$(INTERNAL_PRODUCT).PRODUCT_COPY_FILES_OVERRIDES)))
+
+ifneq ($(PRODUCT_COPY_FILES_OVERRIDES),)
+    PRODUCT_COPY_FILES := $(filter-out $(PRODUCT_COPY_FILES_OVERRIDES), $(PRODUCT_COPY_FILES))
+endif
+
+.PHONY: listcopies
+listcopies:
+	@echo "Copy files: $(PRODUCT_COPY_FILES)"
+	@echo "Overrides: $(PRODUCT_COPY_FILES_OVERRIDES)"
+
+
 # A list of property assignments, like "key = value", with zero or more
 # whitespace characters on either side of the '='.
 PRODUCT_PROPERTY_OVERRIDES := \
@@ -342,6 +358,9 @@ PRODUCT_PROPERTY_OVERRIDES := \
 # used for adding properties to default.prop
 PRODUCT_DEFAULT_PROPERTY_OVERRIDES := \
     $(strip $(PRODUCTS.$(INTERNAL_PRODUCT).PRODUCT_DEFAULT_PROPERTY_OVERRIDES))
+
+PRODUCT_BUILD_PROP_OVERRIDES := \
+	$(strip $(PRODUCTS.$(INTERNAL_PRODUCT).PRODUCT_BUILD_PROP_OVERRIDES))
 
 # Should we use the default resources or add any product specific overlays
 PRODUCT_PACKAGE_OVERLAYS := \
