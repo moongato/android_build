@@ -84,6 +84,9 @@ Usage:  ota_from_target_files [flags] input_target_files output_ota_package
       Specifies the number of worker-threads that will be used when
       generating patches for incremental updates (defaults to 3).
 
+  --override_device <device>
+      Override device-specific asserts. Can be a comma-separated list.
+
 """
 
 import sys
@@ -122,6 +125,7 @@ OPTIONS.updater_binary = None
 OPTIONS.oem_source = None
 OPTIONS.fallback_to_full = True
 OPTIONS.full_radio = False
+OPTIONS.override_device = 'auto'
 
 def MostPopularKey(d, default):
   """Given a dict, return the key corresponding to the largest
@@ -401,7 +405,10 @@ def SignOutput(temp_zip_name, output_zip_name):
 def AppendAssertions(script, info_dict, oem_dict=None):
   oem_props = info_dict.get("oem_fingerprint_properties")
   if oem_props is None or len(oem_props) == 0:
-    device = GetBuildProp("ro.product.device", info_dict)
+    if OPTIONS.override_device == "auto":
+      device = GetBuildProp("ro.product.device", info_dict)
+    else:
+      device = OPTIONS.override_device    
     script.AssertDevice(device)
   else:
     if oem_dict is None:
@@ -519,7 +526,7 @@ def WriteFullOTAPackage(input_zip, output_zip):
       info_dict=OPTIONS.info_dict)
 
   has_recovery_patch = HasRecoveryPatch(input_zip)
-  block_based = OPTIONS.block_based and has_recovery_patch
+  block_based = OPTIONS.block_based
 
   #if not OPTIONS.omit_prereq:
   #  ts = GetBuildProp("ro.build.date.utc", OPTIONS.info_dict)
@@ -606,8 +613,8 @@ else if get_stage("%(bcb_dev)s") == "3/3" then
     script.FormatPartition("/system")
     script.Mount("/system", recovery_mount_options)
     script.Mount("/data")
-    if not has_recovery_patch:
-      script.UnpackPackageDir("recovery", "/system")
+    #if not has_recovery_patch:
+    #  script.UnpackPackageDir("recovery", "/system")
     script.UnpackPackageDir("system", "/system")
 
     symlinks = CopyPartitionFiles(system_items, input_zip, output_zip)
@@ -1367,7 +1374,7 @@ else
 
     if not target_has_recovery_patch:
       def output_sink(fn, data):
-        common.ZipWriteStr(output_zip, "recovery/" + fn, data)
+        # common.ZipWriteStr(output_zip, "recovery/" + fn, data)
         system_items.Get("system/" + fn)
 
       common.MakeRecoveryPatch(OPTIONS.target_tmp, output_sink,
@@ -1441,9 +1448,9 @@ else
     script.Print("Unpacking new vendor files...")
     script.UnpackPackageDir("vendor", "/vendor")
 
-  if updating_recovery and not target_has_recovery_patch:
-    script.Print("Unpacking new recovery...")
-    script.UnpackPackageDir("recovery", "/system")
+  # if updating_recovery and not target_has_recovery_patch:
+  #  script.Print("Unpacking new recovery...")
+  #  script.UnpackPackageDir("recovery", "/system")
 
   system_diff.EmitRenames(script)
   if vendor_diff:
@@ -1549,6 +1556,8 @@ def main(argv):
       OPTIONS.updater_binary = a
     elif o in ("--no_fallback_to_full",):
       OPTIONS.fallback_to_full = False
+    elif o in ("--override_device"):
+      OPTIONS.override_device = a
     else:
       return False
     return True
@@ -1572,7 +1581,7 @@ def main(argv):
                                  "oem_settings=",
                                  "verify",
                                  "no_fallback_to_full",
-                             ], extra_option_handler=option_handler)
+                             "override_device="], extra_option_handler=option_handler)
 
   if len(args) != 2:
     common.Usage(__doc__)

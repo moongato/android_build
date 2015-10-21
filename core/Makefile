@@ -1309,6 +1309,7 @@ endif
 # host tools needed to build dist and OTA packages
 
 DISTTOOLS :=  $(HOST_OUT_EXECUTABLES)/minigzip \
+  $(HOST_OUT_EXECUTABLES)/adb \
   $(HOST_OUT_EXECUTABLES)/mkbootfs \
   $(HOST_OUT_EXECUTABLES)/mkbootimg \
   $(HOST_OUT_EXECUTABLES)/fs_config \
@@ -1568,6 +1569,12 @@ name := $(name)-$(shell date +"%Y-%m-%d")
 INTERNAL_OTA_PACKAGE_TARGET := $(PRODUCT_OUT)/$(name).zip
 
 $(INTERNAL_OTA_PACKAGE_TARGET): KEY_CERT_PAIR := $(DEFAULT_KEY_CERT_PAIR)
+
+ifeq ($(TARGET_OTA_ASSERT_DEVICE),)
+    $(INTERNAL_OTA_PACKAGE_TARGET): override_device := auto
+else
+    $(INTERNAL_OTA_PACKAGE_TARGET): override_device := $(TARGET_OTA_ASSERT_DEVICE)
+endif
 
 $(INTERNAL_OTA_PACKAGE_TARGET): $(BUILT_TARGET_FILES_PACKAGE) $(DISTTOOLS)
 	@echo -e ${CL_YLW}"Package OTA:"${CL_RST}" $@"
