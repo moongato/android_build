@@ -22,6 +22,7 @@
 
 PRODUCT_PACKAGES += \
     Calculator \
+    Calendar \
     CalendarProvider \
     CaptivePortalLogin \
     CertInstaller \
